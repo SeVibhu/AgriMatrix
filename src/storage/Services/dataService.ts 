@@ -1,0 +1,64 @@
+export function queueChange(item: { id: number; name: string }, action: string) {
+  db.transaction(tx => {
+    tx.executeSql("INSERT INTO pending (itemId, name, action) VALUES (?, ?, ?);", [
+      item.id,
+      item.name,
+      action,
+    ]);
+  });
+}
+
+// src/services/dataService.ts
+import { fetchDataFromServer, pushUpdateToServer, addItemToServer } from "../api/dataApi";
+import {
+  initDb,
+  getLocalData,
+  saveDataLocally,
+  markUnsyncedChange,
+  queueChange,
+  getPendingChanges,
+  clearPendingChange,
+} from "../storage/localDb";
+
+export async function initialize() {
+  initDb();
+}
+
+export async function loadLocal(callback: (rows: any[]) => void) {
+  getLocalData(callback);
+}
+
+export async function syncWithServer(callback: (rows: any[]) => void) {
+  try {
+    const serverData = await fetchDataFromServer();
+    saveDataLocally(serverData);
+    getLocalData(callback);
+  } catch (err) {
+    console.log("Offline mode, using local data");
+    getLocalData(callback);
+  }
+}
+
+export async function updateItem(item: { id: number; name: string }, callback: (rows: any[]) => void) {
+  // Save locally + queue change
+  markUnsyncedChange(item);
+  queueChange(item, "update");
+  getLocalData(callback);
+}
+
+export async function processQueue(callback: (rows: any[]) => void) {
+  const pending = await getPendingChanges();
+  for (const change of pending) {
+    try {
+      if (change.action === "update") {
+        await pushUpdateToServer({ id: change.itemId, name: change.name });
+      } else if (change.action === "add") {
+        await addItemToServer({ name: change.name });
+      }
+      clearPendingChange(change.id);
+    } catch {
+      console.log("Still offline, will retry later");
+    }
+  }
+  await syncWithServer(callback);
+}
