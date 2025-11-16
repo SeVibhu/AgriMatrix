@@ -13,7 +13,7 @@ export default function App() {
         const rows = await fetchExcel(url);
         setData(rows);
       } catch (error) {
-        console.error('Failed to load Excel data:', error);
+        console.error('Failed to load Excel file data:', error);
       } finally {
         setLoading(false);
       }

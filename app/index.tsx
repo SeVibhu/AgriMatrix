@@ -45,7 +45,7 @@ export default function App() {
         console.log('Fetched rows:', rows); // Debugging
         setData(rows);
       } catch (err) {
-        console.error('Excel load error:', err);
+        console.error('Excel file load error:', err);
       } finally {
         setLoading(false);
       }
